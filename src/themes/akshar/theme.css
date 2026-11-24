@@ -1,0 +1,14 @@
+/* Theme: Akshar — colours and fonts. Layout choices are in config.ts. */
+:root {
+  --theme-accent: #9f1239;
+  --font-head: 'Tiro Devanagari Hindi', var(--font-fallback);
+  --font-title: 'Tiro Devanagari Hindi', var(--font-fallback);
+  --font-body: 'Hind', var(--font-fallback);
+  --font-ui: 'Hind', var(--font-fallback);
+  --head-weight: 400;
+  --title-weight: 400;
+  --bg: #ffffff;
+}
+
+.card__title { font-size: 1.12rem; line-height: 1.55; }
+.sm-logo__name { letter-spacing: 0; }
