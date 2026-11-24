@@ -6,7 +6,7 @@
 
 backend:
   name: github
-  repo: YOUR-GITHUB-USERNAME/ananta-newz # ← change to your GitHub "user/repo"
+  repo: kundanrathi5-cyber/the-jawai-news # ← change to your GitHub "user/repo"
   branch: main
 
 site_url: https://the-jawai-news.pages.dev
