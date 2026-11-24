@@ -1,0 +1,174 @@
+---
+// "खबर सुनें": the admin pastes a Google Drive share link of an audio file (or any direct .mp3/.m4a link)
+// into the story's "खबर का ऑडियो" field. Nothing loads until the reader taps the button, so pages stay fast
+// and no data is spent for readers who don't listen.
+//
+// Drive links are played in the browser's own player via Drive's download address. If Drive refuses
+// (file not shared publicly, too large, or Google changes something), the player falls back to Drive's own
+// embedded player, and a plain "open it here" link is always shown underneath as the last resort.
+import { t } from '../lib/i18n';
+
+interface Props {
+  url?: string | null;
+}
+
+/** Google Drive file id from any share link: /file/d/<id>/…, ?id=<id>, /open?id=<id>, /uc?id=<id>. */
+function driveId(link: string): string | undefined {
+  if (!/(^|\.)google\.com$/.test(safeHost(link))) return undefined;
+  return link.match(/\/file\/d\/([\w-]{10,})/)?.[1] ?? link.match(/[?&]id=([\w-]{10,})/)?.[1];
+}
+function safeHost(link: string): string {
+  try {
+    return new URL(link).hostname;
+  } catch {
+    return '';
+  }
+}
+
+const link = (Astro.props.url ?? '').trim();
+const id = link ? driveId(link) : undefined;
+const source = !/^https?:\/\//i.test(link)
+  ? undefined
+  : id
+    ? {
+        play: `https://drive.google.com/uc?export=download&id=${id}`,
+        preview: `https://drive.google.com/file/d/${id}/preview`,
+        open: `https://drive.google.com/file/d/${id}/view`,
+      }
+    : { play: link, preview: '', open: link };
+---
+
+{
+  source && (
+    <div class="story-audio" data-story-audio data-src={source.play} data-preview={source.preview} data-pagefind-ignore>
+      <button type="button" class="story-audio__btn">
+        <span class="story-audio__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path fill="currentColor" d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+        <span class="story-audio__label">{t('listenNews')}</span>
+        <span class="story-audio__wave" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+      </button>
+      <a class="story-audio__open" href={source.open} target="_blank" rel="noopener" hidden>
+        {t('audioTrouble')}
+      </a>
+    </div>
+  )
+}
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-story-audio]').forEach((box) => {
+    const button = box.querySelector<HTMLButtonElement>('.story-audio__btn');
+    const openLink = box.querySelector<HTMLAnchorElement>('.story-audio__open');
+    const { src = '', preview = '' } = box.dataset;
+    if (!button || !src) return;
+
+    const showDrivePlayer = () => {
+      box.querySelector('audio')?.remove();
+      if (openLink) openLink.hidden = false;
+      if (!preview || box.querySelector('iframe')) return;
+      const frame = document.createElement('iframe');
+      frame.src = preview;
+      frame.title = button.textContent?.trim() || 'Audio';
+      frame.allow = 'autoplay';
+      frame.className = 'story-audio__frame';
+      box.insertBefore(frame, openLink);
+    };
+
+    button.addEventListener('click', () => {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.autoplay = true;
+      audio.preload = 'auto';
+      audio.className = 'story-audio__player';
+      audio.addEventListener('error', showDrivePlayer, { once: true });
+      audio.src = src;
+      button.replaceWith(audio);
+      audio.play().catch(() => {
+        /* Autoplay can be refused; the controls are there to press play. Load errors go to 'error'. */
+      });
+      // Show the backup link once playback starts too, in case the reader wants Drive's own page.
+      if (openLink) openLink.hidden = false;
+    });
+  });
+</script>
+
+<style>
+  .story-audio {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0 0 1.5rem;
+  }
+  .story-audio__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: fit-content;
+    padding: 0.55rem 1.1rem 0.55rem 0.55rem;
+    border: 1px solid var(--line, #ddd);
+    border-radius: 999px;
+    background: var(--surface, #fff);
+    color: var(--ink, #111);
+    font: 600 1rem/1.2 var(--font-ui, system-ui, sans-serif);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .story-audio__btn:hover,
+  .story-audio__btn:focus-visible {
+    border-color: var(--accent, var(--brand, #c00));
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+  }
+  .story-audio__icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--accent, var(--brand, #c00));
+    color: var(--on-accent, var(--on-brand, #fff));
+  }
+  .story-audio__wave {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 1.1rem;
+  }
+  .story-audio__wave i {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--accent, var(--brand, #c00));
+    opacity: 0.55;
+  }
+  .story-audio__wave i:nth-child(1) { height: 40%; }
+  .story-audio__wave i:nth-child(2) { height: 85%; }
+  .story-audio__wave i:nth-child(3) { height: 60%; }
+  .story-audio__wave i:nth-child(4) { height: 100%; }
+  .story-audio__wave i:nth-child(5) { height: 45%; }
+  .story-audio__player {
+    width: 100%;
+    max-width: 34rem;
+  }
+  .story-audio__frame {
+    width: 100%;
+    max-width: 34rem;
+    height: 64px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--sunk, #f2f2f2);
+  }
+  .story-audio__open {
+    width: fit-content;
+    font: 500 0.85rem/1.3 var(--font-ui, system-ui, sans-serif);
+    color: var(--muted, #666);
+  }
+  .story-audio__open[hidden] {
+    display: none;
+  }
+</style>
